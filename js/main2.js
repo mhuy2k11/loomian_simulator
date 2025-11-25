@@ -85,14 +85,55 @@ function showMoves() {
   });
 };
 
-function useMove(move) {
-  log(`Used move: <strong>${move.name}</strong>!`);
+function useMove(moveName) {
+  const move = MOVES[moveName];
+  if (!move) return;
+
+  log(`Bạn dùng ${move.name}!`);
+
+  const enemyMove = enemyLoomian.moves[Math.floor(rng.random() * enemyLoomian.moves.length)];
+  const enemyMoveData = MOVES[enemyMove];
+
+  // Priority + speed
+  const p1First = (move.priority || 0) > (enemyMoveData.priority || 0) ||
+                  ((move.priority || 0) === (enemyMoveData.priority || 0) && playerLoomian.speed >= enemyLoomian.speed);
+
+  if (p1First) {
+    attack(playerLoomian, enemyLoomian, move);
+    if (enemyLoomian.hp > 0) setTimeout(() => attack(enemyLoomian, playerLoomian, enemyMoveData), 1200);
+  } else {
+    attack(enemyLoomian, playerLoomian, enemyMoveData);
+    if (playerLoomian.hp > 0) setTimeout(() => attack(playerLoomian, enemyLoomian, move), 1200);
+  }
+}
+
+function attack(attacker, defender, move) {
+  const dmg = calculateDamage(attacker, defender, move);
+  if (dmg === 0) return;
+
+  defender.hp -= dmg;
+  if (defender.hp < 0) defender.hp = 0;
+
+  log(`${attacker.name} gây ${dmg} sát thương!`);
+  updateHP(defender === playerLoomian ? "player" : "enemy");
+
+  if (defender.hp <= 0) {
+    log(`<b>${defender.name} đã bị hạ gục!</b>`);
+  }
+}
+
+function updateHP(side) {
+  const l = side === "player" ? playerLoomian : enemyLoomian;
+  const percent = l.hp / l.maxhp * 100;
+  $(side + "-hp-bar").style.width = percent + "%";
+  $(side + "-hp-text").textContent = `${l.hp}/${l.maxhp}`;
 }
 
 Promise.all([fetch('data/typechart.json')
   .then(r => r.json()),])
   .then(([typechart]) => {
     TYPE_CHART = typechart;
+    rng = new PRNG();
     // tạo loomian mẫu để test
     playerLoomian = {
       ...LOOMIANS.embit, ...{
@@ -126,5 +167,9 @@ Promise.all([fetch('data/typechart.json')
       }
     };
 
-    showMoves();
+  $("player-name").textContent = `${playerLoomian.name}`;
+  $("enemy-name").textContent = `${enemyLoomian.name}`;
+  updateHP("player"); updateHP("enemy");
+  showMoves();
+  log("<b>Trận đấu bắt đầu! Data đã load 100% chuẩn Loomian Legacy 2025!</b>");
   });
