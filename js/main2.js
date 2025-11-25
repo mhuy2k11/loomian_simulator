@@ -85,6 +85,10 @@ function showMoves() {
   });
 };
 
+function useMove(move) {
+  log(`Used move: <strong>${move.name}</strong>!`);
+}
+
 Promise.all([fetch('data/typechart.json')
   .then(r => r.json()),])
   .then(([typechart]) => {
