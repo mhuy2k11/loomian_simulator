@@ -89,7 +89,7 @@ function useMove(moveName) {
   const move = MOVES[moveName];
   if (!move) return;
 
-  log(`Bạn dùng ${move.name}!`);
+  log(`You used ${move.name}!`);
 
   const enemyMove = enemyLoomian.moves[Math.floor(rng.random() * enemyLoomian.moves.length)];
   const enemyMoveData = MOVES[enemyMove];
@@ -114,11 +114,11 @@ function attack(attacker, defender, move) {
   defender.hp -= dmg;
   if (defender.hp < 0) defender.hp = 0;
 
-  log(`${attacker.name} gây ${dmg} sát thương!`);
+  log(`${attacker.name} dealt ${dmg} damage!`);
   updateHP(defender === playerLoomian ? "player" : "enemy");
 
   if (defender.hp <= 0) {
-    log(`<b>${defender.name} đã bị hạ gục!</b>`);
+    log(`<b>${defender.name} has fainted!</b>`);
   }
 }
 
@@ -134,7 +134,7 @@ Promise.all([fetch('data/typechart.json')
   .then(([typechart]) => {
     TYPE_CHART = typechart;
     rng = new PRNG();
-    // tạo loomian mẫu để test
+    // create sample loomians for testing
     playerLoomian = {
       ...LOOMIANS.embit, ...{
         level: 50,
@@ -171,5 +171,4 @@ Promise.all([fetch('data/typechart.json')
   $("enemy-name").textContent = `${enemyLoomian.name}`;
   updateHP("player"); updateHP("enemy");
   showMoves();
-  log("<b>Trận đấu bắt đầu! Data đã load 100% chuẩn Loomian Legacy 2025!</b>");
   });
