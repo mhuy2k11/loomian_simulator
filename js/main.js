@@ -1,7 +1,6 @@
-// main.js – BẢN CUỐI CÙNG, SIÊU MẠNH, DỄ HIỂU, DỄ MỞ RỘNG
 let TYPE_CHART = {};
-let LOOMIANS = {};
-let MOVES = {};
+let MOVES = moves;
+let LOOMIANS = loomians;
 
 let rng;
 let playerLoomian, enemyLoomian;
@@ -9,68 +8,83 @@ let playerLoomian, enemyLoomian;
 const $ = id => document.getElementById(id);
 const logDiv = $("log");
 
+
 function log(text) {
   logDiv.innerHTML += "<br>" + text + "<br>";
   logDiv.scrollTop = logDiv.scrollHeight;
 }
 
-// Tính stat chuẩn Loomian Legacy (UHN + Personality sau này thêm dễ)
-function calcStat(base, level = 50) {
-  return Math.floor((2 * base + 31 + Math.floor(252 / 4)) * level / 100) + 5;
+function calcStat(base, level = 50, tp, pers = 1) {
+  return Math.floor(((2 * base + 40 + Math.floor(tp / 4)) * level / 100) + 5) * pers;
 }
-function calcHP(base, level = 50) {
-  return Math.floor((2 * base + 31 + Math.floor(252 / 4)) * level / 100) + level + 10;
+function calcEnergy(base, level = 50, tp, pers = 1) {
+  return Math.floor(((2 * base + 40 + Math.floor(tp / 4)) * level / 65) + 80) * pers;
+}
+function calcHealth(base, level = 50, tp) {
+  return Math.floor(((2 * base + 40 + Math.floor(tp / 4)) * level / 100) + 10);
 }
 
-// Tính hiệu quả loại
-function getEffectiveness(moveType, defTypes) {
+function getEffectiveness(atkType, defTypes) {
   let mult = 1;
-  defTypes.forEach(type => {
-    if (TYPE_CHART[type] && TYPE_CHART[type][moveType] !== undefined) {
-      mult *= TYPE_CHART[type][moveType];
+  defTypes.forEach(defType => {
+    if (TYPE_CHART[atkType] && TYPE_CHART[atkType][defType] !== undefined) {
+      mult *= TYPE_CHART[atkType][defType];
     }
   });
   return mult;
-}
+};
 
-// Damage calculator CHUẨN 100% như calc trên GitHub
-void function calculateDamage(attacker, defender, move) {
-  if (!rng.randomChance(move.accuracy || 100, 100)) {
-    log("Nhưng chiêu bị miss!");
+function showMoves() {
+  const menu = $("move-menu");
+  if (!menu) return;
+  menu.innerHTML = "";
+
+  if (!playerLoomian || !Array.isArray(playerLoomian.moves)) {
+    return;
   }
 
-  let damage = (2 * attacker.level / 5 + 2) * move.power;
-  damage = Math.floor(damage / 50) + 2;
+  playerLoomian.moves.forEach(move => {
+    const btn = document.createElement("div");
+    btn.className = "move-btn";
 
-  if (move.mr === "Melee") {
-    damage = Math.floor(damage * attacker.meleeAtk / defender.meleeDef);
-  } else {
-    damage = Math.floor(damage * attacker.rangedAtk / defender.rangedDef);
-  }
+    const rawType = move.type || "Simple";
+    const moveType = rawType.toLowerCase(); // normalize to lowercase
+    const moveTypeClass = moveType.replace(/\s+/g, "-");
+    const displayType = rawType[0].toUpperCase() + rawType.slice(1); // "Fire"
 
-  // STAB
-  if (attacker.types.includes(move.type)) damage = Math.floor(damage * 1.5);
+    // add per-type class for CSS styling
+    btn.classList.add(`type-${moveTypeClass}`); // e.g. type-fire
 
-  // Type effectiveness
-  const eff = getEffectiveness(move.type, defender.types);
-  if (eff > 1) log("Rất hiệu quả!");
-  if (eff < 1 && eff > 0) log("Không hiệu quả lắm...");
-  if (eff === 0) { log("Không hiệu quả!"); return 0; }
-  damage = Math.floor(damage * eff);
+    // fallback values
+    const range = (typeof move.range === "string") ? move.range : "Melee";
+    const power = (typeof move.power === "number") ? move.power : "—";
+    const acc = (typeof move.acc === "number") ? move.acc : 100;
+    const moveName = move.name || "Unknown Move";
+    const desc = move.description || "";
 
-  // Critical
-  if (rng.isCriticalHit()) {
-    damage = Math.floor(damage * 1.5);
-    log("Critical hit!");
-  }
+    // data attributes for later logic/styling & accessible title
+    btn.dataset.power = power;
+    btn.dataset.range = range;
+    btn.dataset.acc = acc;
+    btn.dataset.type = displayType;
+    btn.title = desc || `${moveName} — Type: ${displayType}\nPower: ${power}  Acc: ${acc}%  Range: ${range}`;
 
-  // Random roll 85-100
-  damage = Math.floor(damage * rng.getDamageRoll() / 100);
+    btn.innerHTML = `
+      <div class="move-main">
+        <div class="move-name">${moveName}</div>
+        <div class="move-type"><span class="type type-${moveTypeClass}">${displayType}</span></div>
+      </div>
+      <div class="move-meta">
+        <span class="move-info">${range} ${power} STR · ${acc}% ACC</span>
+      </div>
+    `;
 
-  return damage;
-}
+    btn.tabIndex = 0;
+    btn.onclick = () => useMove(move);
+    menu.appendChild(btn);
+  });
+};
 
-// Khi người chơi chọn chiêu
 function useMove(moveName) {
   const move = MOVES[moveName];
   if (!move) return;
@@ -115,60 +129,47 @@ function updateHP(side) {
   $(side + "-hp-text").textContent = `${l.hp}/${l.maxhp}`;
 }
 
-function showMoves() {
-  const menu = $("move-menu");
-  menu.innerHTML = "";
-  playerLoomian.moves.forEach(moveKey => {
-    const move = MOVES[moveKey];
-    if (!move) return;
-    const btn = document.createElement("div");
-    btn.className = "move-btn";
-    btn.innerHTML = `${move.name}<br><span class="type ${move.type}">${move.type}</span>`;
-    btn.onclick = () => useMove(moveKey);
-    menu.appendChild(btn);
-  });
-}
+Promise.all([fetch('data/typechart.json')
+  .then(r => r.json()),])
+  .then(([typechart]) => {
+    TYPE_CHART = typechart;
+    rng = new PRNG();
+    // tạo loomian mẫu để test
+    playerLoomian = {
+      ...LOOMIANS.embit, ...{
+        level: 50,
+        hp: calcHealth(LOOMIANS.embit.baseStats.hp, 50, 40),
+        maxhp: calcHealth(LOOMIANS.embit.baseStats.hp, 50, 40),
+        energy: calcEnergy(LOOMIANS.embit.baseStats.energy, 50, 40),
+        maxenergy: calcEnergy(LOOMIANS.embit.baseStats.energy, 50, 40),
+        meleeAtk: calcStat(LOOMIANS.embit.baseStats.attack, 50, 40),
+        rangedAtk: calcStat(LOOMIANS.embit.baseStats.attackR, 50, 40),
+        meleeDef: calcStat(LOOMIANS.embit.baseStats.defense, 50, 40),
+        rangedDef: calcStat(LOOMIANS.embit.baseStats.defenseR, 50, 40),
+        speed: calcStat(LOOMIANS.embit.baseStats.speed, 50, 40),
+        moves: [MOVES.adaptiveAssault, MOVES.claySlap, MOVES.bodyCrash, MOVES.fireSlam]
+      }
+    };
 
-// LOAD TẤT CẢ DATA
-Promise.all([
-  fetch('data/typechart.json').then(r => r.json()),
-  fetch('data/loomians.js').then(r => r.text()).then(text => eval(text)), // load loomians object
-  fetch('data/moves.js').then(r => r.json())
-])
-.then(([typechart, _, moves]) => {
-  TYPE_CHART = typechart;
-  MOVES = moves;
+    enemyLoomian = {
+      ...LOOMIANS.rabburn, ...{
+        level: 50,
+        hp: calcHealth(LOOMIANS.rabburn.baseStats.hp, 50, 40),
+        maxhp: calcHealth(LOOMIANS.rabburn.baseStats.hp, 50, 40),
+        energy: calcEnergy(LOOMIANS.rabburn.baseStats.energy, 50, 40),
+        maxenergy: calcEnergy(LOOMIANS.rabburn.baseStats.energy, 50, 40),
+        meleeAtk: calcStat(LOOMIANS.rabburn.baseStats.attack, 50, 40),
+        rangedAtk: calcStat(LOOMIANS.rabburn.baseStats.attackR, 50, 40),
+        meleeDef: calcStat(LOOMIANS.rabburn.baseStats.defense, 50, 40),
+        rangedDef: calcStat(LOOMIANS.rabburn.baseStats.defenseR, 50, 40),
+        speed: calcStat(LOOMIANS.rabburn.baseStats.speed, 50, 40),
+        moves: [MOVES.adaptiveAssault, MOVES.claySlap, MOVES.bodyCrash, MOVES.banefulBash]
+      }
+    };
 
-  rng = new PRNG();
-
-  // TEST: Embit vs Rabbitron (sau này thay bằng team builder)
-  playerLoomian = { ...LOOMIANS.embit, ...{
-    level: 50,
-    hp: calcHP(LOOMIANS.embit.baseStats.hp),
-    maxhp: calcHP(LOOMIANS.embit.baseStats.hp),
-    meleeAtk: calcStat(LOOMIANS.embit.baseStats.attack),
-    rangedAtk: calcStat(LOOMIANS.embit.baseStats.attackR),
-    meleeDef: calcStat(LOOMIANS.embit.baseStats.defense),
-    rangedDef: calcStat(LOOMIANS.embit.baseStats.defenseR),
-    speed: calcStat(LOOMIANS.embit.baseStats.speed),
-    moves: ["kindledRage", "boomBash", "vitalSurge", "banefulBash"] // ví dụ
-  }};
-
-  enemyLoomian = { ...LOOMIANS.rabburn, ...{
-    level: 50,
-    hp: calcHP(LOOMIANS.rabburn.baseStats.hp),
-    maxhp: calcHP(LOOMIANS.rabburn.baseStats.hp),
-    meleeAtk: calcStat(LOOMIANS.rabburn.baseStats.attack),
-    rangedAtk: calcStat(LOOMIANS.rabburn.baseStats.attackR),
-    meleeDef: calcStat(LOOMIANS.rabburn.baseStats.defense),
-    rangedDef: calcStat(LOOMIANS.rabburn.baseStats.defenseR),
-    speed: calcStat(LOOMIANS.rabburn.baseStats.speed),
-    moves: ["kindledRage", "boomBash"]
-  }};
-
-  $("player-name").textContent = `${playerLoomian.name} Lv.${playerLoomian.level}`;
-  $("enemy-name").textContent = `${enemyLoomian.name} Lv.${enemyLoomian.level}`;
+  $("player-name").textContent = `${playerLoomian.name}`;
+  $("enemy-name").textContent = `${enemyLoomian.name}`;
   updateHP("player"); updateHP("enemy");
   showMoves();
   log("<b>Trận đấu bắt đầu! Data đã load 100% chuẩn Loomian Legacy 2025!</b>");
-});
+  });
